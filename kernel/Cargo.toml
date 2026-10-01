@@ -1,0 +1,10 @@
+[package]
+name = "mog-kernel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# 0.5.x is the last line that builds on stable Rust (0.6.x requires
+# #![feature(ptr_metadata)] and therefore nightly).
+limine = "0.5"
+font8x8 = { version = "0.3", default-features = false }
