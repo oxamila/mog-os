@@ -20,6 +20,22 @@ make help      # list all targets
 Other test modes: `make smoke-bios` (legacy BIOS/SeaBIOS path),
 `make smoke-atom` (TCG, `-cpu Denverton`), `make run-atom`.
 
+## Compatibility
+
+Works on essentially any x86-64 PC from ~2006 onward:
+
+- **64-bit CPU required** — the kernel is x86-64 only. 32-bit-only machines
+  (early Atom N270/N280, Pentium M, pre-2006 PCs) will not boot.
+- **Legacy BIOS PCs**: work out of the box, no firmware settings needed.
+- **UEFI PCs**: disable Secure Boot first — Limine is not Microsoft-signed.
+- **32-bit-only UEFI** (rare 2009–2011 boards/Macs) is not supported; the
+  image ships `BOOTX64.EFI` only.
+- No serial port or specific GPU required: without COM1 the kernel still
+  boots and reports status on the framebuffer alone.
+
+Verified on a Dell Inspiron Mini 1018 (Atom N450, 2010, legacy BIOS) and
+under QEMU with OVMF/UEFI, SeaBIOS, and `-cpu Denverton` (TCG).
+
 ## Real hardware
 
 ```sh
@@ -31,8 +47,6 @@ The image is hybrid: GPT with an EFI System partition (UEFI machines) and
 a BIOS boot partition with Limine's BIOS stages (legacy machines — no
 UEFI setup or Secure Boot changes needed; pick the plain USB entry in the
 boot menu).
-
-Verified on a Dell Inspiron Mini 1018 (Atom N450, 2010, legacy BIOS only).
 
 ## Layout
 
