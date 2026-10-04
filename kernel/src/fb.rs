@@ -52,6 +52,26 @@ impl<'a> Fb<'a> {
         }
     }
 
+    /// Solid axis-aligned rectangle (clipped to the screen).
+    pub fn fill_rect(&self, x: u64, y: u64, w: u64, h: u64, color: u32) {
+        for yy in y..y.saturating_add(h) {
+            for xx in x..x.saturating_add(w) {
+                self.put_pixel(xx, yy, color);
+            }
+        }
+    }
+
+    /// UI button: filled panel, border (amber when selected), centered label.
+    pub fn button(&self, x: u64, y: u64, w: u64, h: u64, label: &str, selected: bool) {
+        self.fill_rect(x, y, w, h, 0x0023_3141);
+        let border = if selected { 0x00ff_cc33 } else { 0x004a_5b6e };
+        self.draw_frame(x, y, w, h, border, 3);
+        let tx = x + (w - Self::text_width(label, 2).min(w)) / 2;
+        let ty = y + (h.saturating_sub(16)) / 2;
+        let fg = if selected { 0x00ff_ee88 } else { 0x00dd_e8f0 };
+        self.draw_text(tx, ty, label, fg, 2);
+    }
+
     /// Hollow rectangle with a fixed thickness, in pixels.
     pub fn draw_frame(&self, x: u64, y: u64, w: u64, h: u64, color: u32, thickness: u64) {
         for t in 0..thickness {
