@@ -13,7 +13,7 @@ endif
 
 export PROFILE
 
-.PHONY: all build limine image run run-bios run-atom smoke smoke-bios smoke-atom debug clean help
+.PHONY: all build limine image run run-bios run-atom smoke smoke-bios smoke-atom smoke-power debug clean help
 
 all: build
 
@@ -52,6 +52,11 @@ smoke-bios: image
 ## smoke-atom: headless boot test under -cpu Denverton (slower, no KVM)
 smoke-atom: image
 	./scripts/smoke.sh atom
+
+## smoke-power: shutdown/restart tests (QEMU must actually exit; TCG)
+smoke-power: image
+	./scripts/power-test.sh atom restart
+	./scripts/power-test.sh atom shutdown
 
 ## debug: start QEMU halted (-s -S); attach gdb in another terminal
 debug: image

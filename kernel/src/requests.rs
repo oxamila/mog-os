@@ -7,14 +7,22 @@
 
 use limine::BaseRevision;
 use limine::request::{
-    FramebufferRequest, MemoryMapRequest, RequestsEndMarker, RequestsStartMarker, RsdpRequest,
+    FramebufferRequest, HhdmRequest, MemoryMapRequest, RequestsEndMarker, RequestsStartMarker,
+    RsdpRequest,
 };
 
-/// Base revision tag. `BaseRevision::new()` requests revision 3, which the
-/// Limine 12.x bootloader accepts on x86-64.
+/// Base revision tag. Revision 6 (highest supported by Limine 12.x) —
+/// importantly, revisions ≥4 have the bootloader map the ACPI tables into
+/// the HHDM for us, while revision 3 excludes ACPI regions entirely
+/// (reading the RSDP would page-fault).
 #[used]
 #[unsafe(link_section = ".requests")]
-pub static BASE_REVISION: BaseRevision = BaseRevision::new();
+pub static BASE_REVISION: BaseRevision = BaseRevision::with_revision(6);
+
+/// Higher-half direct map: physical→virtual translation for ACPI parsing.
+#[used]
+#[unsafe(link_section = ".requests")]
+pub static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
 
 #[used]
 #[unsafe(link_section = ".requests")]

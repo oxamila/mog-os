@@ -13,13 +13,17 @@
 #![no_main]
 
 mod fb;
+mod io;
+mod kbd;
 mod panic;
+mod power;
 mod requests;
 mod serial;
 
 use fb::Fb;
+use kbd::{Kbd, Key};
 use limine::memory_map::EntryType;
-use requests::{BASE_REVISION, FRAMEBUFFER_REQUEST, MEMMAP_REQUEST, RSDP_REQUEST};
+use requests::{BASE_REVISION, FRAMEBUFFER_REQUEST, HHDM_REQUEST, MEMMAP_REQUEST, RSDP_REQUEST};
 
 /// Human-readable name for a Limine memory-map entry type.
 fn mem_type_name(t: EntryType) -> &'static str {
@@ -62,6 +66,12 @@ unsafe extern "C" fn kmain() -> ! {
         kprintln!("[limine] WARNING: base revision request not honoured");
     }
 
+    // Higher-half direct map: how power.rs reaches physical ACPI tables.
+    match HHDM_REQUEST.get_response() {
+        Some(resp) => kprintln!("[limine] HHDM direct map at {:#x}", resp.offset()),
+        None => kprintln!("[limine] WARNING: no HHDM — ACPI tables unreadable"),
+    }
+
     // --- Physical memory map (feeds the future PMM) -----------------------
     match MEMMAP_REQUEST.get_response() {
         Some(resp) => {
@@ -88,7 +98,7 @@ unsafe extern "C" fn kmain() -> ! {
     }
 
     // --- ACPI RSDP (phase 3 will walk RSDT → MADT → SMP) -------------------
-    // Base revision 3 reports a physical address.
+    // Base revision ≥4 reports it as an HHDM address; power.rs parses it.
     match RSDP_REQUEST.get_response() {
         Some(resp) => kprintln!("[acpi] RSDP at {:#x}", resp.address()),
         None => kprintln!("[acpi] RSDP not reported by bootloader"),
@@ -164,5 +174,92 @@ unsafe extern "C" fn kmain() -> ! {
         scr.draw_text(x, y, msg, 0x0066_ff66, 3);
     }
 
-    halt_loop()
+    // --- Interactive menu: power buttons driven by the PS/2 keyboard ------
+    // No IDT/IRQs yet, so input is polled (kbd::poll).
+    kprintln!("[ui] LEFT/RIGHT select, ENTER confirm, R restart, S shutdown");
+    let mut kbd = Kbd::new();
+    kbd.init();
+    let mut selected = 0usize; // 0 = Restart, 1 = Shutdown
+    if let Some(scr) = &screen {
+        draw_menu(scr, selected);
+    }
+
+    loop {
+        let Some(key) = kbd.poll() else {
+            core::hint::spin_loop();
+            continue;
+        };
+
+        let nav = match key {
+            Key::Left => Some(0),
+            Key::Right => Some(1),
+            Key::Tab => Some((selected + 1) % 2),
+            _ => None,
+        };
+        if let Some(sel) = nav {
+            if sel != selected {
+                selected = sel;
+                if let Some(scr) = &screen {
+                    draw_menu(scr, selected);
+                }
+            }
+            continue;
+        }
+
+        match key {
+            Key::Enter if selected == 0 => restart_now(&screen),
+            Key::Enter => shutdown_now(&screen),
+            Key::Letter(b'R') => restart_now(&screen),
+            Key::Letter(b'S') => shutdown_now(&screen),
+            _ => {}
+        }
+    }
+}
+
+/// Redraw both power buttons and the key-hint line.
+fn draw_menu(scr: &Fb<'_>, selected: usize) {
+    let (w, h) = (scr.width(), scr.height());
+    let (bw, bh, gap) = (200u64, 44u64, 32u64);
+    let y = h / 4 + 170;
+    let x0 = w.saturating_sub(bw * 2 + gap) / 2;
+    scr.button(x0, y, bw, bh, "Restart", selected == 0);
+    scr.button(x0 + bw + gap, y, bw, bh, "Shutdown", selected == 1);
+    let hint = "LEFT/RIGHT select   ENTER confirm   R restart   S shutdown";
+    let hx = w.saturating_sub(Fb::text_width(hint, 2)) / 2;
+    scr.draw_text(hx, y + bh + 24, hint, 0x0099_aabb, 2);
+}
+
+/// Status line above the ready banner; erases any previous one.
+fn announce(scr: &Fb<'_>, text: &str, color: u32) {
+    let (w, h) = (scr.width(), scr.height());
+    scr.fill_rect(
+        16,
+        h.saturating_sub(104),
+        w.saturating_sub(32),
+        24,
+        0x0016_222e,
+    );
+    let x = w.saturating_sub(Fb::text_width(text, 2)) / 2;
+    scr.draw_text(x, h.saturating_sub(100), text, color, 2);
+}
+
+fn restart_now(screen: &Option<Fb<'_>>) -> ! {
+    if let Some(scr) = screen {
+        announce(scr, "Restarting...", 0x00ff_cc33);
+    }
+    kprintln!("[power] restart");
+    power::restart()
+}
+
+fn shutdown_now(screen: &Option<Fb<'_>>) {
+    if let Some(scr) = screen {
+        announce(scr, "Shutting down...", 0x0099_e0ff);
+    }
+    kprintln!("[power] shutdown");
+    if !power::shutdown() {
+        if let Some(scr) = screen {
+            announce(scr, "shutdown FAILED", 0x00ff_5555);
+        }
+        kprintln!("[power] shutdown FAILED — machine still running");
+    }
 }
