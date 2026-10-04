@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/oxamila/mog-os/actions/workflows/ci.yml/badge.svg)](https://github.com/oxamila/mog-os/actions/workflows/ci.yml)
 
+Full walkthrough (controls, tests, real hardware, contribution flow):
+[MANUAL.md](MANUAL.md)
+
 A hobby x86-64 operating system written in Rust, targeting Intel Atom
 machines. Boots via [Limine](https://github.com/Limine-Bootloader/Limine)
 on both UEFI and legacy BIOS, paints a UEFI GOP / VESA framebuffer banner,
